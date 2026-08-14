@@ -1,11 +1,12 @@
-// import React from "react";
-// import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-// import Home from "./pages/Home";
-// import Shop from "./pages/Shop";
-// import Cart from "./Pages/Cart";
-// import Admin from "./pages/AdminDashboard";
-// import Login from "./pages/Login";
-// import ProtectedRoute from "./component/ProtectedRoute";
+import React from "react";
+import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import Home from "./pages/Home";
+import Shop from "./pages/Shop";
+import Cart from "./Pages/Cart";
+import Admin from "./pages/AdminDashboard";
+import Login from "./pages/Login";
+import ProtectedRoute from "./component/ProtectedRoute";
+import NavigationGuard from "./component/NavigationGuard";
 
 // const App = () => {
 //   return (
@@ -32,20 +33,7 @@
 
 
 
-import React from "react";
-import {
-  BrowserRouter as Router,
-  Route,
-  Routes,
-} from "react-router-dom";
 
-import Home from "./pages/Home";
-import Shop from "./pages/Shop";
-import Cart from "./Pages/Cart";
-import Admin from "./pages/AdminDashboard";
-import Login from "./pages/Login";
-import ProtectedRoute from "./component/ProtectedRoute";
-import NavigationGuard from "./component/NavigationGuard";
 
 const App = () => {
   return (
