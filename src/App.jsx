@@ -1,82 +1,71 @@
-import React from "react";
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+} from "react-router-dom";
+
 import Home from "./pages/Home";
 import Shop from "./pages/Shop";
-import Cart from "./Pages/Cart";
+import Cart from "./pages/Cart";
 import Admin from "./pages/AdminDashboard";
 import Login from "./pages/Login";
+import Add from "./pages/Add";
 import ProtectedRoute from "./component/ProtectedRoute";
-import NavigationGuard from "./component/NavigationGuard";
+import { CartProvider } from "./context/CartContext";
 
-// const App = () => {
-//   return (
-//     <Router>
-//       <Routes>
-//         <Route path="/" element={<Home />} />
-//         <Route path="/shop" element={<Shop />} />
-//         <Route path="/cart" element={<Cart />} />
-//         <Route
-//           path="/main"
-//           element={
-//             <ProtectedRoute>
-//               <Admin/>
-//             </ProtectedRoute>
-//           }
-//         />
-//         <Route path="/login" element={<Login />} />
-//       </Routes>
-//     </Router>
-//   );
-// };
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
 
-// export default App;
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [pathname]);
 
-
-
-
+  return null;
+};
 
 const App = () => {
   return (
     <Router>
+      <CartProvider>
+        <ScrollToTop />
 
-      <NavigationGuard />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/shop" element={<Shop />} />
+          <Route path="/cart" element={<Cart />} />
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/admin/login"
+            element={<Navigate to="/login" replace />}
+          />
 
-      <Routes>
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <Admin />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* PUBLIC PAGES */}
-        <Route
-          path="/"
-          element={<Home />}
-        />
+          <Route
+            path="/admin/add-artwork"
+            element={
+              <ProtectedRoute>
+                <Add />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/shop"
-          element={<Shop />}
-        />
+          {/* Legacy dashboard URL kept so old bookmarks still work. */}
+          <Route path="/main" element={<Navigate to="/admin" replace />} />
 
-        <Route
-          path="/cart"
-          element={<Cart />}
-        />
-
-        {/* ADMIN LOGIN */}
-        <Route
-          path="/login"
-          element={<Login />}
-        />
-
-        {/* PROTECTED ADMIN */}
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute>
-              <Admin />
-            </ProtectedRoute>
-          }
-        />
-
-      </Routes>
-
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </CartProvider>
     </Router>
   );
 };

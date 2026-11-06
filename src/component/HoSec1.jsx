@@ -1,4 +1,4 @@
-import React from "react";
+import { Link } from "react-router-dom";
 import { ArrowDownRight } from "lucide-react";
 
 const HoSec1 = () => {
@@ -71,7 +71,10 @@ const HoSec1 = () => {
             Art · Expression · Identity · Perspective
           </p>
 
-          <div className="group flex items-center gap-3 text-[10px] uppercase tracking-[0.25em] text-black/60">
+          <Link
+            to="/shop"
+            className="group flex items-center gap-3 text-[10px] uppercase tracking-[0.25em] text-black/60 transition hover:text-black"
+          >
             Explore the work
 
             <span className="flex h-10 w-10 items-center justify-center rounded-full border border-black/20 transition-all duration-500 group-hover:bg-black group-hover:text-white">
@@ -80,7 +83,7 @@ const HoSec1 = () => {
                 strokeWidth={1.2}
               />
             </span>
-          </div>
+          </Link>
 
         </div>
 

@@ -1,4 +1,4 @@
-import React from "react";
+import { Link } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
 
 const Hosec2 = () => {
@@ -78,11 +78,11 @@ const Hosec2 = () => {
 
             {/* READ MORE */}
             <div className="mt-12">
-              <a
-                href="/about"
+              <Link
+                to="/shop"
                 className="group inline-flex items-center gap-4 border-b border-black/30 pb-2 text-[11px] uppercase tracking-[0.2em] text-black transition-colors duration-300 hover:border-black"
               >
-                Discover the artist
+                Explore the collection
 
                 <span className="flex h-8 w-8 items-center justify-center rounded-full border border-black/20 transition-all duration-300 group-hover:bg-black group-hover:text-white">
                   <ArrowUpRight
@@ -90,7 +90,7 @@ const Hosec2 = () => {
                     strokeWidth={1.3}
                   />
                 </span>
-              </a>
+              </Link>
             </div>
 
           </div>

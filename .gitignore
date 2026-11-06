@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local data and secrets
+.env
+server/data
+server/uploads
+.env.example
+
