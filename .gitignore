@@ -24,8 +24,5 @@ dist-ssr
 *.sw?
 
 # Local data and secrets
-.env
-server/data
-server/uploads
 .env.example
 
