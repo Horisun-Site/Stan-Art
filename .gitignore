@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
+.vercel
 
 # Editor directories and files
 .vscode/*
@@ -24,5 +25,11 @@ dist-ssr
 *.sw?
 
 # Local data and secrets
-.env.example
+.env
+.env.*.local
+server/data
+server/uploads
 
+
+.vercel
+.env*

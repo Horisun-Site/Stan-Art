@@ -1,23 +1,27 @@
 # Stan Art Studio
 
-A contemporary art portfolio and studio shop built with React, Vite and Tailwind CSS. The site now runs on a **free, self-hosted Node + SQLite backend** instead of Firebase, so there is no paid database or image-storage bill.
+A contemporary art portfolio and studio shop built with React, Vite and Tailwind CSS. The API is a small Express app that can run two ways:
 
-## What changed
+- **Locally:** Node + SQLite + images in `server/uploads/`.
+- **On Vercel:** a serverless function + Postgres (Neon/Vercel Postgres) + Vercel Blob.
 
-- **Firebase removed.** No Firestore, Firebase Auth or Firebase Storage is used anymore.
-- **SQLite database.** Artwork and sales records live in `server/data/stan-art.db`.
-- **Local image storage.** Uploaded artwork images are saved in `server/uploads/` and served by the studio server.
-- **New admin login.** Email + password sign-in is verified by the server, with a signed session token.
-- **Working shop.** Artworks added in the dashboard appear on the home page and in the shop.
-- **Working cart.** Visitors can request to purchase an artwork; requests arrive in the dashboard as **pending sales**.
-- **Working dashboard.** Overview stats, artwork management, price editing, sale recording and purchase-request management.
+The frontend and API are in the same project. There is no Firebase dependency.
+
+## Features
+
+- **Admin login.** Email + password sign-in is verified by the server, with a signed session token.
+- **Artwork management.** Add, edit and delete artworks, with images, dimensions, medium, collection, year and price.
+- **Working shop and cart.** Artworks appear on the home page and shop; visitors can submit purchase requests.
+- **Sales dashboard.** Requests arrive as **pending sales**, and can be marked paid or cancelled. Offline sales can also be recorded.
+- **Stats.** Artwork counts, revenue, monthly revenue and pending-request count.
+- **Portable storage.** SQLite or Postgres for data; local disk or Vercel Blob for images.
 
 ## Requirements
 
-- Node.js **22.13 or newer** (the app uses Node's built-in `node:sqlite` module).
+- Node.js **22.13 or newer** (the local database uses Node's built-in `node:sqlite` module).
 - npm.
 
-## Quick start
+## Quick start (local)
 
 ```bash
 npm install
@@ -29,7 +33,14 @@ npm run dev
 - Admin dashboard: http://localhost:5173/admin
 - API server: http://localhost:5174
 
-`npm run dev` starts the Vite frontend and the Node server together. The frontend proxies `/api` and `/uploads` to the server.
+`npm run dev` starts the Vite frontend and the Node server together. Vite proxies `/api` and `/uploads` to the server.
+
+With no cloud variables set, the app automatically uses:
+
+| Setting | Local default |
+| --- | --- |
+| Database | `server/data/stan-art.db` (SQLite) |
+| Images | `server/uploads/` (served at `/uploads/...`) |
 
 ## Admin login
 
@@ -54,27 +65,105 @@ To change your login:
 
 > `.env.local` is ignored by Git. Never commit it or share it publicly. If you deploy the site, set these values in your host's environment settings instead.
 
-## Production
+## Deploy to Vercel
+
+The site is set up for Vercel's serverless platform. Vercel cannot keep SQLite or local image files, so production uses hosted Postgres and Vercel Blob.
+
+### 1. Create the Vercel project
+
+1. Push the repository to GitHub.
+2. In Vercel, choose **Add New → Project** and import the repository.
+3. Vercel detects Vite. Keep the defaults:
+   - Build command: `npm run build`
+   - Output directory: `dist`
+4. Deploy once. The frontend will load, but the API needs the steps below.
+
+### 2. Add Postgres
+
+1. Open the project in Vercel.
+2. Go to **Storage → Create Database → Neon** (or **Vercel Postgres**).
+3. Create a free database and **connect it to this project** for Production, Preview and Development.
+4. Vercel adds `DATABASE_URL` (or `POSTGRES_URL`) automatically. The API detects it and switches from SQLite to Postgres.
+
+### 3. Add Vercel Blob
+
+1. Go to **Storage → Create → Blob**.
+2. Create a **public** store and **connect it to this project**. Artwork images are public by design.
+3. Vercel adds `BLOB_READ_WRITE_TOKEN` automatically. The browser then uploads images directly to Blob, avoiding the serverless request-size limit.
+
+### 4. Add the auth variables
+
+In **Settings → Environment Variables**, add these for Production, Preview and Development:
+
+| Variable | Example | Required |
+| --- | --- | --- |
+| `ADMIN_EMAIL` | `you@example.com` | Yes |
+| `ADMIN_PASSWORD` | a long unique password | Yes |
+| `AUTH_SECRET` | a long random string | Yes |
+| `DATABASE_URL` | added by the Neon integration | Yes on Vercel |
+| `BLOB_READ_WRITE_TOKEN` | added by the Blob integration | Yes on Vercel |
+
+Use the same admin values as your local `.env.local`. Changing `AUTH_SECRET` signs out existing sessions.
+
+### 5. Redeploy
+
+Environment variables and the `api/` function are only picked up by a new deployment. Open **Deployments → … → Redeploy** after adding the storage integrations and variables.
+
+### 6. Verify
+
+- `https://your-project.vercel.app/api/health` should return JSON like:
+  ```json
+  { "ok": true, "database": "postgres", "storage": "blob", "time": "..." }
+  ```
+- `https://your-project.vercel.app/api/config` should return `{ "storage": "blob" }`.
+- Sign in at `/login` and add an artwork.
+
+If `/api/health` returns HTML or login returns **405**, the `api/[...path].js` function was not included in the deployment. Check the **Functions** tab in Vercel, confirm the latest commit was deployed, and redeploy.
+
+The new Postgres database starts empty. Re-add artworks in the dashboard, or import the contents of `server/data/stan-art.db` if you have local data worth keeping.
+
+## Production (self-hosted Node)
+
+The original long-lived Node setup still works, including SQLite and local uploads:
 
 ```bash
 npm run build
 npm start
 ```
 
-The server serves the built frontend from `dist/` and exposes the site at http://localhost:5174. It also serves uploaded images from `/uploads`.
+The server serves the built frontend from `dist/` at http://localhost:5174 and serves uploaded images from `/uploads`. Use a host with a persistent disk for this mode. If you set `DATABASE_URL` and `BLOB_READ_WRITE_TOKEN`, the same server uses Postgres and Blob instead.
+
+## How storage is selected
+
+The server picks storage automatically at startup:
+
+| Environment | Database | Images |
+| --- | --- | --- |
+| No `DATABASE_URL` / `POSTGRES_URL` / `POSTGRES_PRISMA_URL` (local) | SQLite in `server/data/` | Local `server/uploads/` |
+| Postgres URL present | Postgres | Local disk, unless Blob is configured |
+| `BLOB_READ_WRITE_TOKEN` present | SQLite or Postgres | Vercel Blob |
+| On Vercel without a database URL | **Unconfigured** — API returns a clear 503 | Local disk is also disabled |
+| On Vercel without `BLOB_READ_WRITE_TOKEN` | Postgres | **Unconfigured** — uploads are blocked with a clear error |
+
+`GET /api/config` reports the active image mode (`blob`, `disk` or `unconfigured`) so the add-artwork form knows whether to upload directly to Blob.
 
 ## Data and backups
 
-Everything important is in two folders:
+### Local / self-hosted
 
 | Path | Contents |
 | --- | --- |
 | `server/data/stan-art.db` | SQLite database (artworks, sales, prices, buyers) |
 | `server/uploads/` | Uploaded artwork images |
 
-To back up the studio, stop the server and copy both folders somewhere safe. To start fresh, stop the server and delete both folders; they are recreated automatically on the next start.
+Stop the server and copy both folders to back up the studio. To start fresh, stop the server and delete both folders; they are recreated automatically.
 
-Both folders are ignored by Git, so your artwork data will not be committed.
+### Vercel
+
+- Artworks and sales are in the connected Postgres database. Use the database provider's backup/export tools.
+- Images are in the connected Vercel Blob store. Manage them from **Vercel → Storage → Blob**.
+
+Both local folders are ignored by Git.
 
 ## How the sales flow works
 
@@ -106,12 +195,18 @@ The shop does **not** collect payment online. It collects a purchase request, an
 ## Project structure
 
 ```text
+api/
+  [...path].js      Vercel serverless entry for /api/*
 server/
-  index.js          Express API, auth, uploads and static frontend
-  db.js             SQLite schema and database helpers
+  app.js            Shared Express app (routes, auth, uploads)
+  index.js          Local Node server + built frontend
+  db.js             Runtime database dispatcher (SQLite or Postgres)
+  db-sqlite.js      SQLite adapter (local)
+  db-postgres.js    Postgres adapter (Vercel / Neon)
   auth.js           Password verification and signed session tokens
+  http.js           Shared 404 and error-handling middleware
   data/             SQLite database (ignored by Git)
-  uploads/          Artwork images (ignored by Git)
+  uploads/          Local artwork images (ignored by Git)
 
 src/
   lib/api.js        Frontend API client and token handling
@@ -119,6 +214,7 @@ src/
   component/        Shared UI, shop sections and dashboard modals
   pages/            Home, Shop, Cart, Login, Dashboard, Add artwork
 
+vercel.json         Vercel build/runtime configuration
 .env.local          Local admin credentials (ignored by Git)
 .env.example        Template for environment variables
 ```
@@ -131,37 +227,34 @@ src/
 | `npm run dev:client` | Start only the Vite frontend |
 | `npm run dev:server` | Start only the Node API |
 | `npm run build` | Build the frontend into `dist/` |
-| `npm start` | Run the production server (build first) |
+| `npm start` | Run the production Node server (build first) |
 | `npm run lint` | Run ESLint |
-
-## Cost and hosting
-
-Running locally is completely free and has no usage limits from a cloud provider.
-
-For a live public site, this app needs a Node host with **persistent disk storage**, because SQLite and uploaded images are files on the server. Some free hosts use ephemeral filesystems, so data can reset on redeploy. Good options:
-
-- Run it on a home computer or mini PC with a process manager.
-- Use a Node host that includes a persistent volume.
-- If you need a fully hosted free setup, the next step would be to swap SQLite + local files for **Supabase** (free Postgres + storage) or **Neon + Cloudinary**. The frontend already talks to a small API layer, so that migration would be contained to `server/`.
-
-Firebase Storage was the part that required a paid Blaze plan. It is no longer part of this project, and the old Firebase keys have been removed from `.env.local`.
 
 ## Security checklist
 
 - [ ] Change `ADMIN_PASSWORD` and `AUTH_SECRET` before putting the site online.
-- [ ] Keep `.env.local` and `server/data/` private.
-- [ ] Back up `server/data/` and `server/uploads/` regularly.
-- [ ] Put the production server behind HTTPS.
-- [ ] If you deploy, set environment variables in the host dashboard, not inside a committed file.
+- [ ] Set the same values in Vercel's environment settings, never in a committed file.
+- [ ] Keep `.env.local`, `server/data/` and `server/uploads/` private.
+- [ ] Back up your Postgres database and Blob store regularly.
+- [ ] Use HTTPS in production (Vercel provides it automatically).
+- [ ] Do not reuse the development password on the public site.
 
 ## Troubleshooting
+
+**`POST /api/auth/login 405 (Method Not Allowed)` on Vercel** — the API function was not deployed. Confirm `api/[...path].js` exists in the repository, check the Vercel **Functions** tab, and redeploy the latest commit.
+
+**`/api/health` returns the HTML page** — the SPA rewrite is handling the API path, which means no API function matched. Make sure the deployment includes `api/[...path].js`, that `vercel.json` is committed with the `/api/:path*` rewrite, and that the latest commit was deployed.
+
+**Login works but adding an artwork fails** — open `/api/config`. If `storage` is `unconfigured`, connect a Vercel Blob store and redeploy so `BLOB_READ_WRITE_TOKEN` is available. If it is `disk`, the deployment is writing to a temporary filesystem; connect Blob.
+
+**Data disappears on Vercel** — make sure a Postgres database is connected and `/api/health` reports `"database":"postgres"`. Without it, the app falls back to SQLite, which cannot persist on serverless functions.
+
+**Uploaded images disappear after redeploy** — local disk storage is ephemeral on serverless hosts. Use Vercel Blob (or another persistent object store).
 
 **`EADDRINUSE` on port 5174** — another server is already running. Stop it, or change `PORT` in `.env.local` and update the Vite proxy in `vite.config.js`.
 
 **The admin login says the server is unreachable** — make sure `npm run dev` is running both processes, or that `npm start` is running for production.
 
-**Uploaded images disappear after redeploy** — the host is using an ephemeral filesystem. Move to a host with a persistent disk, or migrate image storage.
+**I forgot my login** — edit the environment variables and restart (locally) or redeploy (Vercel). Credentials are not stored in the database.
 
-**I forgot my login** — edit `.env.local` and restart. The credentials are not stored anywhere else.
-
-**Reset the installation** — stop the server, delete `server/data/` and `server/uploads/`, then start again.
+**Reset the local installation** — stop the server, delete `server/data/` and `server/uploads/`, then start again.

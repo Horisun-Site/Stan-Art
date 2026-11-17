@@ -9,7 +9,7 @@ import {
   X,
 } from "lucide-react";
 
-import { createArtwork } from "../lib/api";
+import { createArtwork, fetchConfig, getToken } from "../lib/api";
 import { CATEGORY_OPTIONS } from "../lib/constants";
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -43,6 +43,26 @@ const Adding = () => {
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
+  const [storageMode, setStorageMode] = useState("disk");
+
+  useEffect(() => {
+    let active = true;
+
+    fetchConfig()
+      .then((config) => {
+        if (active && config?.storage) {
+          setStorageMode(config.storage);
+        }
+      })
+      .catch(() => {
+        // Keep the local disk flow as the fallback. Uploading will still
+        // show the server error if the API is unreachable.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!imagePreview) return undefined;
@@ -123,21 +143,71 @@ const Adding = () => {
       return;
     }
 
-    const payload = new FormData();
-    payload.append("image", imageFile);
-    payload.append("title", formData.title.trim());
-    payload.append("description", formData.description.trim());
-    payload.append("price", formData.price);
-    payload.append("category", formData.category);
-    payload.append("collectionName", formData.collectionName.trim());
-    payload.append("medium", formData.medium.trim());
-    payload.append("dimensions", formData.dimensions.trim());
-    payload.append("year", formData.year);
-    payload.append("status", formData.status);
+    if (storageMode === "unconfigured") {
+      setError(
+        "Image storage is not configured. Add a Vercel Blob store to the project and redeploy.",
+      );
+      return;
+    }
+
+    const details = {
+      title: formData.title.trim(),
+      description: formData.description.trim(),
+      price: formData.price,
+      category: formData.category,
+      collectionName: formData.collectionName.trim(),
+      medium: formData.medium.trim(),
+      dimensions: formData.dimensions.trim(),
+      year: formData.year,
+      status: formData.status,
+    };
 
     try {
       setLoading(true);
-      await createArtwork(payload);
+
+      if (storageMode === "blob") {
+        const token = getToken();
+
+        if (!token) {
+          navigate("/login", {
+            replace: true,
+            state: { from: location.pathname },
+          });
+          return;
+        }
+
+        const { upload } = await import("@vercel/blob/client");
+        const safeName =
+          imageFile.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-80) ||
+          "artwork.jpg";
+
+        const blob = await upload(
+          `artworks/${Date.now()}-${safeName}`,
+          imageFile,
+          {
+            access: "public",
+            handleUploadUrl: "/api/uploads",
+            contentType: imageFile.type,
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+
+        await createArtwork({ ...details, imageUrl: blob.url });
+      } else {
+        const payload = new FormData();
+        payload.append("image", imageFile);
+        payload.append("title", details.title);
+        payload.append("description", details.description);
+        payload.append("price", details.price);
+        payload.append("category", details.category);
+        payload.append("collectionName", details.collectionName);
+        payload.append("medium", details.medium);
+        payload.append("dimensions", details.dimensions);
+        payload.append("year", details.year);
+        payload.append("status", details.status);
+
+        await createArtwork(payload);
+      }
 
       setSuccess("Artwork published successfully.");
       setFormData(initialForm);
@@ -145,7 +215,10 @@ const Adding = () => {
       setImagePreview(null);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (submitError) {
-      if (submitError.status === 401) {
+      if (
+        submitError.status === 401 ||
+        /401|unauthori[sz]ed/i.test(String(submitError.message || ""))
+      ) {
         navigate("/login", {
           replace: true,
           state: { from: location.pathname },
@@ -161,6 +234,13 @@ const Adding = () => {
       setLoading(false);
     }
   };
+
+  const storageNote =
+    storageMode === "blob"
+      ? "Images are uploaded securely to Vercel Blob."
+      : storageMode === "unconfigured"
+        ? "Image storage is not configured. Add a Vercel Blob store and redeploy."
+        : "Images are stored on your studio server.";
 
   return (
     <main className="min-h-screen bg-neutral-50 px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
@@ -185,8 +265,14 @@ const Adding = () => {
               </p>
             </div>
 
-            <p className="text-xs text-neutral-400">
-              Images are stored on your studio server — no paid storage needed.
+            <p
+              className={`text-xs ${
+                storageMode === "unconfigured"
+                  ? "text-red-600"
+                  : "text-neutral-400"
+              }`}
+            >
+              {storageNote}
             </p>
           </div>
         </div>

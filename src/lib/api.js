@@ -100,6 +100,10 @@ export async function fetchMe() {
 
 /* Artworks --------------------------------------------------------- */
 
+export async function fetchConfig() {
+  return request("/config");
+}
+
 export async function fetchArtworks(status) {
   const query = status ? `?status=${encodeURIComponent(status)}` : "";
   const data = await request(`/artworks${query}`);
